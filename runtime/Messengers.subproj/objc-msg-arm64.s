@@ -113,7 +113,7 @@ _objc_indexed_classes:
 1:
 
 #elif __LP64__
-	// 64-bit packed isa
+	// 64-bit packed isa  //与上 偏移量 获取到真正的类地址
 	and	p16, $0, #ISA_MASK
 
 #else
@@ -412,16 +412,21 @@ _objc_debug_taggedpointer_ext_classes:
 
 	ENTRY _objc_msgSend
 	UNWIND _objc_msgSend, NoFrame
-
+//将 self 与 0 进行比较
 	cmp	p0, #0			// nil check and tagged pointer check
 #if SUPPORT_TAGGED_POINTERS
+// <= 0 跳转到 LNilOrTagged 进行 nil 或者 tagged pointer 的处理, 因为 tagged pointer 在 arm64 下 最高位为 1, 作为有符号数 < 0
 	b.le	LNilOrTagged		//  (MSB tagged pointer looks negative)
 #else
 	b.eq	LReturnZero
 #endif
+
+    //读取 x0内的 isa 到 x13 寄存器中
 	ldr	p13, [x0]		// p13 = isa
+    //获取 class 的地址 方法 p16寄存器中
 	GetClassFromIsa_p16 p13		// p16 = class
 LGetIsaDone:
+    //在缓存中查找或者进行完整的方法查找
 	// calls imp or objc_msgSend_uncached
 	CacheLookup NORMAL, _objc_msgSend
 

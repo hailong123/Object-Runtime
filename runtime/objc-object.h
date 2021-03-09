@@ -390,6 +390,8 @@ objc_object::setWeaklyReferenced_nolock()
         ClearExclusive(&isa.bits);
         return;
     }
+    
+    //设置 isa指针中弱引用的标识
     newisa.weakly_referenced = true;
     if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
 }

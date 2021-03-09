@@ -7,10 +7,20 @@
 
 #import <Foundation/Foundation.h>
 
+#import "TestObj.h"
+
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
-        NSLog(@"Hello, World! %@", [NSString class]);
+        
+        TestObj *obj = [[TestObj alloc] init];
+        
+        __weak weakObj = obj;
+        
+        [obj setBlock:^(id  _Nonnull obj) {
+            NSLog(@"%@",weakObj);
+        }];
+        
     }
     return 0;
 }

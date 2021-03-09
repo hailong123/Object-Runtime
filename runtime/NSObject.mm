@@ -273,7 +273,10 @@ template <HaveOld haveOld, HaveNew haveNew,
 static id 
 storeWeak(id *location, objc_object *newObj)
 {
+    //检查新旧对象必须含有其中的一个
     ASSERT(haveOld  ||  haveNew);
+    
+    //如果 haveNew == No 判断 newObj != nil 否则崩溃
     if (!haveNew) ASSERT(newObj == nil);
 
     Class previouslyInitializedClass = nil;
@@ -281,24 +284,30 @@ storeWeak(id *location, objc_object *newObj)
     SideTable *oldTable;
     SideTable *newTable;
 
-    // Acquire locks for old and new values.
-    // Order by lock address to prevent lock ordering problems. 
-    // Retry if the old value changes underneath us.
+    // Acquire locks for old and new values.  获取新,老旧值的锁
+    // Order by lock address to prevent lock ordering problems. //通过锁定地址来防止锁定排序问题
+    // Retry if the old value changes underneath us. //如果旧值在我们下面改变 请重试
  retry:
     if (haveOld) {
+        //取出旧值
         oldObj = *location;
+        //这里的 & 是引用的意思 "[oldObj]" 是对 '[]' 的重载
+        //其实StripedMap 是一个以 void *p 为key ,PaddedT 为Value的表
         oldTable = &SideTables()[oldObj];
     } else {
         oldTable = nil;
     }
     if (haveNew) {
+        //取出新值的散列表
         newTable = &SideTables()[newObj];
     } else {
         newTable = nil;
     }
 
+    //散列表加锁
     SideTable::lockTwo<haveOld, haveNew>(oldTable, newTable);
 
+    //如果有旧值, 但是 *location != oldObj 代表可能有其他线程修改了 location的内容, 就重新重试
     if (haveOld  &&  *location != oldObj) {
         SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable);
         goto retry;
@@ -307,11 +316,16 @@ storeWeak(id *location, objc_object *newObj)
     // Prevent a deadlock between the weak reference machinery
     // and the +initialize machinery by ensuring that no 
     // weakly-referenced object has an un-+initialized isa.
+    //通过 确保弱引用对象没有一个未初始化的isa指针 来防止弱引用 机制 和 +initialize机制 之间的死锁.
+    
     if (haveNew  &&  newObj) {
         Class cls = newObj->getIsa();
+        //如果没有初始化类就调用初始化 容错机制
         if (cls != previouslyInitializedClass  &&  
             !((objc_class *)cls)->isInitialized()) 
         {
+            
+           
             SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable);
             class_initialize(cls, (id)newObj);
 
@@ -322,18 +336,20 @@ storeWeak(id *location, objc_object *newObj)
             // not yet initialized to the check above.
             // Instead set previouslyInitializedClass to recognize it on retry.
             previouslyInitializedClass = cls;
-
+            //初始化之后重新进行尝试
             goto retry;
         }
     }
 
-    // Clean up old value, if any.
+    // Clean up old value, if any. 有旧值就清理 不做任何判断
     if (haveOld) {
+        //有旧值说明已注册, 则取消注册操作
         weak_unregister_no_lock(&oldTable->weak_table, oldObj, location);
     }
 
-    // Assign new value, if any.
+    // Assign new value, if any.  如果有新值
     if (haveNew) {
+        //注册新值的弱引用
         newObj = (objc_object *)
             weak_register_no_lock(&newTable->weak_table, (id)newObj, location, 
                                   crashIfDeallocating);
@@ -341,6 +357,7 @@ storeWeak(id *location, objc_object *newObj)
 
         // Set is-weakly-referenced bit in refcount table.
         if (newObj  &&  !newObj->isTaggedPointer()) {
+            //设置 obj 中 isa.weakly_referenced = true 代表有弱引用
             newObj->setWeaklyReferenced_nolock();
         }
 

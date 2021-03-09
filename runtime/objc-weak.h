@@ -77,31 +77,38 @@ typedef DisguisedPtr<objc_object *> weak_referrer_t;
 // Therefore out_of_line_ness == 0b10 is used to mark the out-of-line state.
 #define REFERRERS_OUT_OF_LINE 2
 
+//存放某个对象的所有弱引用指针 如果弱引用对象数量不超过4个就保存在结构体数组中
+//inline_referrers 否则保存在referrers中.
 struct weak_entry_t {
-    DisguisedPtr<objc_object> referent;
+    DisguisedPtr<objc_object> referent; //弱引用对象
     union {
         struct {
-            weak_referrer_t *referrers;
+            weak_referrer_t *referrers; //弱引用数组
             uintptr_t        out_of_line_ness : 2;
-            uintptr_t        num_refs : PTR_MINUS_2;
+            uintptr_t        num_refs : PTR_MINUS_2;  //引用数量
             uintptr_t        mask;
-            uintptr_t        max_hash_displacement;
+            uintptr_t        max_hash_displacement; //最大哈希冲突值
         };
+        //弱引用数组 weak_referrer_t 小于等于 4用这个
         struct {
             // out_of_line_ness field is low bits of inline_referrers[1]
             weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT];
         };
     };
 
+    //判断是否使用 referrers 来存储弱引用指针
     bool out_of_line() {
         return (out_of_line_ness == REFERRERS_OUT_OF_LINE);
     }
 
+    //memcpy 复制内存指针方法
+    //覆盖老数据
     weak_entry_t& operator=(const weak_entry_t& other) {
         memcpy(this, &other, sizeof(other));
         return *this;
     }
 
+    //构造方法
     weak_entry_t(objc_object *newReferent, objc_object **newReferrer)
         : referent(newReferent)
     {

@@ -856,6 +856,12 @@ enum { CacheLineSize = 64 };
 // for cache-friendly lock striping. 
 // For example, this may be used as StripedMap<spinlock_t>
 // or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
+/*
+    StripedMap 是 void *->T 的映射, 其大小适合于 缓存友好 的 lock striping. 例如
+ 它可以用作 StripedMap<spinlock_t>或 StripedMap 其中 SomeStruct 存储 spin lock
+ cache-friendly: 那么按照高速缓存的工作原理, 可以发现局部性良好的程序, 缓存命中率的概率
+ 更高, 从这个意义上来讲, 程序也会更快, 我们称这样的程序, 是高速缓存友好的程序
+ */
 template<typename T>
 class StripedMap {
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
@@ -944,47 +950,63 @@ class StripedMap {
 // Note that weak_entry_t knows about this encoding.
 template <typename T>
 class DisguisedPtr {
+    //unsigned long 类型的value 足够保存转化为整数的内存地址
     uintptr_t value;
 
     static uintptr_t disguise(T* ptr) {
+        //把T的地址转化为 unsigned long 并取负值
         return -(uintptr_t)ptr;
     }
 
     static T* undisguise(uintptr_t val) {
+        //把 unsigned long 类型的 val 转为指针 对应上面的 disguise 函数
         return (T*)-val;
     }
 
  public:
-    DisguisedPtr() { }
+    DisguisedPtr() { } //构造函数
+    
+    //初始化列表 ptr 初始化 value 成员变量
     DisguisedPtr(T* ptr) 
         : value(disguise(ptr)) { }
+    
+    //复制构造函数
     DisguisedPtr(const DisguisedPtr<T>& ptr) 
         : value(ptr.value) { }
 
+    //重载操作符
+    //T* 赋值函数 把一个 T 指针赋值给 DisguisedPtr<T> 类型变量是, 直接发生地址到整数的转化
     DisguisedPtr<T>& operator = (T* rhs) {
         value = disguise(rhs);
         return *this;
     }
+    
+    //DisguisedPtr<T>& 引用赋值函数
     DisguisedPtr<T>& operator = (const DisguisedPtr<T>& rhs) {
         value = rhs.value;
         return *this;
     }
 
     operator T* () const {
+        //unsigned long value 转回 指针
         return undisguise(value);
     }
-    T* operator -> () const { 
+    T* operator -> () const {
+        //unsigned long value 转回 指针
         return undisguise(value);
     }
-    T& operator * () const { 
+    T& operator * () const {
+        //转化为指针并取出该指针指向的内容
         return *undisguise(value);
     }
     T& operator [] (size_t i) const {
+        //unsigned long value 转回指针 再找到指定下标 i 位置的值
         return undisguise(value)[i];
     }
 
     // pointer arithmetic operators omitted 
     // because we don't currently use them anywhere
+    // 省略的指针计算运算符, 因为目前我们不在任何地方使用它
 };
 
 // fixme type id is weird and not identical to objc_object*
