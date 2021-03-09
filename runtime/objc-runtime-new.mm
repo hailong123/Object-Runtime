@@ -7740,8 +7740,12 @@ void *objc_destructInstance(id obj)
         bool assoc = obj->hasAssociatedObjects();
 
         // This order is important.
+        //此顺序很重要
+        //C++ 析构函数
         if (cxx) object_cxxDestruct(obj);
+        //移除所有的关联对象 并将自身从 Association Manager 的 map中国移除
         if (assoc) _object_remove_assocations(obj);
+        //
         obj->clearDeallocating();
     }
 

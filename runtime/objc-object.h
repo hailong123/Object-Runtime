@@ -421,10 +421,12 @@ objc_object::clearDeallocating()
 {
     if (slowpath(!isa.nonpointer)) {
         // Slow path for raw pointer isa.
+        //对象的 isa 是原始指针类型时
         sidetable_clearDeallocating();
     }
     else if (slowpath(isa.weakly_referenced  ||  isa.has_sidetable_rc)) {
         // Slow path for non-pointer isa with weak refs and/or side table data.
+        //对象是 isa 优化后时
         clearDeallocating_slow();
     }
 
@@ -438,7 +440,7 @@ objc_object::rootDealloc()
     if (isTaggedPointer()) return;  // fixme necessary?
 
     if (fastpath(isa.nonpointer  &&  
-                 !isa.weakly_referenced  &&  
+                 !isa.weakly_referenced  &&
                  !isa.has_assoc  &&  
                  !isa.has_cxx_dtor  &&  
                  !isa.has_sidetable_rc))

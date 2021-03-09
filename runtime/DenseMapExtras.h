@@ -36,6 +36,9 @@ namespace objc {
 // ExplicitInit / LazyInit wrap doing it the hard way.
 template <typename Type>
 class ExplicitInit {
+    //typedef unsigned char uint8_t 长度为 1 个字节的 int 实际类型 是无符号 char
+    //alignas(Type)表示 _storage 内存对齐方式同抽象类型 Type
+    //_storage 是长度为sizeof(Type)的 uint8_t 类型数组
     alignas(Type) uint8_t _storage[sizeof(Type)];
 
 public:
@@ -45,6 +48,7 @@ public:
     }
 
     Type &get() {
+        //把 _store 数组起始地址强制转化为 Type *
         return *reinterpret_cast<Type *>(_storage);
     }
 };
